@@ -10,3 +10,5 @@
 ![image](https://github.com/user-attachments/assets/afb78b74-e327-4657-9673-661d7317317f)
 Рисунок 4 - Получение списка файлов с помощью метода GET
 
+![image](https://github.com/user-attachments/assets/09f95d81-7334-4bb6-bade-559a32dfaa97)
+Рисунок 5 - Работа в браузере
