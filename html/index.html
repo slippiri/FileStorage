@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud File Manager</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            background: #f5f7fb;
+            color: #2c3e50;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 2px solid #4A148C;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+            border-color: #6A1B9A; /* фиолетовая рамка*/
+        }
+
+        h1 {
+            color: #4A148C;
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 600;
+        }
+
+        .section {
+            margin: 30px 0;
+            padding: 25px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid #E1BEE7; /* Светло-фиолетовая рамка вокруг секции */
+        }
+
+        h2 {
+            color: #4A148C;
+            margin-top: 0;
+            font-size: 1.4em;
+            border-bottom: 2px solid #6A1B9A;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        button, input[type="file"] {
+            padding: 10px 20px;
+            margin: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+
+        }
+
+        button {
+            background: #6A1B9A;
+            color: white;
+        }
+
+            button:hover {
+                background: #4A148C;
+                transform: translateY(-1px);
+            }
+
+        input[type="file"] {
+            background: #e9ecef;
+            border: 1px dashed #6A1B9A;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: 60%;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin: 8px;
+        }
+
+        #responseInfo {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            background: #f8f9fa;
+            border: 1px solid #eee;
+        }
+
+            #responseInfo pre {
+                background: white;
+                color: #2c3e50;
+                border: 1px solid #ddd;
+                margin-top: 10px;
+            }
+
+        .file-list {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+        }
+
+        .file-item {
+            padding: 12px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #6A1B9A;
+            overflow-x: auto;
+        }
+
+        #responseInfo pre {
+            background: white;
+            color: #2c3e50;
+            border: 1px solid #ddd;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            background: #6A1B9A;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FILE STORAGE </h1>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="section">
+            <h2>Upload File</h2>
+            <input type="file" id="fileInput">
+            <button onclick="uploadFile()">Upload to Storage</button>
+            <div id="uploadStatus" class="responseInfo"></div> <!-- Добавлено -->
+        </div>
+
+        <!-- File List Section -->
+        <div class="section">
+            <h2>Your Files</h2>
+            <button onclick="refreshFileList()">Refresh List</button>
+            <ul id="fileList" class="file-list"></ul>
+        </div>
+
+        <!-- API Tools -->
+        <div class="section">
+            <h2>API Tools</h2>
+            <input type="text" id="pathInput" placeholder="/api/file/file.name.txt">
+            <button onclick="sendRequest('GET')">GET</button>
+            <button onclick="sendRequest('HEAD')">HEAD</button>
+            <button onclick="sendRequest('DELETE')">DELETE</button>
+            <div id="responseInfo"></div>
+        </div>
+
+    <script>
+        window.onload = refreshFileList;
+
+
+        // для вывода статусов
+        function showStatus(statusCode, message, isError = false) {
+            const responseInfo = document.getElementById('responseInfo');
+            let statusColor;
+
+            if (statusCode >= 200 && statusCode < 300) {
+                statusColor = '#2ecc71'; 
+            } else if (statusCode >= 400) {
+                statusColor = '#e74c3c'; 
+            } else {
+                statusColor = '#f1c40f'; 
+            }
+
+            responseInfo.innerHTML = `
+        <strong style="color: ${statusColor}">${statusCode}</strong>
+        ${message ? `— ${message}` : ''}
+    `;
+        }
+
+        async function refreshFileList() { //  список файлов с кнопками Download/Delete
+            try {
+                const response = await fetch('/api/file'); // GETзапрос
+                if (!response.ok) {
+                    showStatus(response.status, 'Failed to load files', true);
+                    return;
+                }
+                const files = await response.json();
+                //создание списка
+                const list = document.getElementById('fileList');
+                list.innerHTML = files.map(file => `
+            <li class="file-item">
+                <span>${file}</span>
+                <div>
+                    <button onclick="downloadFile('${file}')">Download</button>
+                    <button onclick="deleteFile('${file}')">Delete</button>
+                </div>
+            </li>
+        `).join('');
+            } catch (error) {
+                showStatus(0, `Network error: ${error.message}`, true);
+            }
+        }
+
+
+        async function uploadFile() { //отправка0 файлф на сервер методом PUT
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showStatus(400, 'Please select a file', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/file/${file.name}`, {
+                    method: 'PUT',
+                    body: file
+                });
+
+                if (response.status === 201) {
+                    showStatus(201, 'Created');
+                    refreshFileList();
+                } else {
+                    const errorText = await response.text();
+                    showStatus(response.status, errorText || 'Upload failed', true);
+                }
+            } catch (error) {
+                showStatus(0, `Network error: ${error.message}`, true);
+            }
+        }
+
+        async function deleteFile(filename) { //удаляем файл через DELETE-запрос
+            try {
+                const response = await fetch(`/api/file/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.status === 204) {
+                    showStatus(204, 'No Content');
+                    refreshFileList();
+                } else {
+                    const errorText = await response.text();
+                    showStatus(response.status, errorText || 'Deletion failed', true);
+                }
+            } catch (error) {
+                showStatus(0, `Network error: ${error.message}`, true);
+            }
+        }
+
+        async function downloadFile(filename) {
+            try {
+                const response = await fetch(`/api/file/${encodeURIComponent(filename)}`);
+
+                if (response.ok) {
+                    // временная ссылку для скачивания
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    a.click();
+                    window.URL.revokeObjectURL(downloadUrl);
+
+                    //  статус успешного скачивания
+                    showStatus(200, `ОК`);
+                } else {
+                    const errorText = await response.text();
+                    showStatus(response.status, errorText || 'Download failed', true);
+                }
+            } catch (error) {
+                showStatus(0, `Network error: ${error.message}`, true);
+            }
+        }
+
+        async function sendRequest(method) {
+            const path = document.getElementById('pathInput').value;
+            const responseInfo = document.getElementById('responseInfo');
+
+            try {
+                const response = await fetch(path, { method });
+                const statusCode = response.status;
+                const statusText = response.statusText;
+
+                let statusColor;
+                if (statusCode >= 200 && statusCode < 300) statusColor = '#2ecc71';
+                else if (statusCode >= 300 && statusCode < 400) statusColor = '#f1c40f';
+                else statusColor = '#e74c3c';
+
+                const statusHTML = `<strong style="color: ${statusColor}">${statusCode} ${statusText}</strong>`;
+                let info = `${statusHTML}<br>`;
+
+                // для HEAD-запросов
+                if (method === 'HEAD') {
+                    info += `Last-Modified: ${response.headers.get('Last-Modified') || 'N/A'}<br>`;
+                    info += `Content-Length: ${response.headers.get('Content-Length') || 'N/A'} bytes`;
+                }
+
+                // для GET-запросов с preview
+                if (method === 'GET') {
+                    if (response.ok) {
+                        const text = await response.text();
+                        info += `<pre>${text}</pre>`;
+                    } else {
+                        info += `Ошибка: ${statusText}`;
+                    }
+                }
+
+              
+
+                responseInfo.innerHTML = info;
+            } catch (error) {
+                responseInfo.innerHTML = `<strong style="color: #e74c3c">Ошибка сети:</strong> ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
